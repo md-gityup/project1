@@ -42,9 +42,20 @@ let alienDir = 1;
 let alienStepDown = false;
 let lastAlienFire = 0;
 
-// Death effect
-const DEATH_EFFECT_DURATION = 1200;
+// Death effect - classic Space Invaders style (flash frames, no particles)
+const DEATH_EFFECT_DURATION = 800;
 let playerDeathEffect = null;
+
+// Alien explosion effects
+const ALIEN_COLORS = [
+  { suit: '#ff4444', accent: '#ffaa44' },
+  { suit: '#ff8844', accent: '#ffdd44' },
+  { suit: '#ffcc44', accent: '#ff6644' },
+  { suit: '#44ff44', accent: '#88ff88' },
+  { suit: '#4488ff', accent: '#88ccff' }
+];
+const EXPLOSION_BASE_DURATION = 400;
+let explosions = [];
 
 function initPlayer() {
   player.x = (W - PLAYER_W) / 2;
@@ -54,39 +65,95 @@ function initPlayer() {
 function playDeathSound() {
   try {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Classic Space Invaders: short punchy descending buzz
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
-    osc.type = 'sawtooth';
-    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+    osc.frequency.linearRampToValueAtTime(55, audioCtx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
     osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + 0.35);
+    osc.stop(audioCtx.currentTime + 0.18);
   } catch (_) {}
+}
+
+function playGameOverSound() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Longer, more dramatic descending tone to emphasize game over
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(330, audioCtx.currentTime);
+    osc.frequency.linearRampToValueAtTime(110, audioCtx.currentTime + 0.25);
+    osc.frequency.linearRampToValueAtTime(55, audioCtx.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.55);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.55);
+  } catch (_) {}
+}
+
+function triggerAlienExplosion(alien) {
+  const cx = alien.x + alien.w / 2;
+  const cy = alien.y + alien.h / 2;
+  const c = ALIEN_COLORS[alien.row];
+  // Intensity scales with level (dialed down ~50% from original)
+  const intensity = Math.min(3, Math.floor(level / 2) + 1);
+  const particleCount = 6 + intensity * 4;
+  const speedMult = 1 + intensity * 0.25;
+  const sizeMult = 1 + intensity * 0.15;
+  const duration = EXPLOSION_BASE_DURATION + intensity * 100;
+
+  const particles = [];
+  for (let i = 0; i < particleCount; i++) {
+    const angle = (i / particleCount) * Math.PI * 2 + Math.random() * 1.2;
+    const speed = (1.5 + Math.random() * 3) * speedMult;
+    const useAccent = Math.random() < 0.3;
+    particles.push({
+      x: cx,
+      y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      size: (1.5 + Math.random() * 2.5) * sizeMult,
+      color: useAccent ? c.accent : c.suit,
+      decay: 0.7 + Math.random() * 0.5
+    });
+  }
+  // Add secondary sparks only at highest intensity
+  if (intensity >= 3) {
+    for (let i = 0; i < 3; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      particles.push({
+        x: cx,
+        y: cy,
+        vx: Math.cos(angle) * (4 + Math.random() * 2),
+        vy: Math.sin(angle) * (4 + Math.random() * 2),
+        life: 1,
+        size: 1.5,
+        color: '#ffffff',
+        decay: 1.2
+      });
+    }
+  }
+  explosions.push({ x: cx, y: cy, startTime: Date.now(), particles, duration });
 }
 
 function triggerPlayerDeath() {
   if (gameState === 'dying') return;
   gameState = 'dying';
-  playDeathSound();
-  const cx = player.x + player.w / 2;
-  const cy = player.y + player.h / 2;
-  const particles = [];
-  for (let i = 0; i < 16; i++) {
-    const angle = (i / 16) * Math.PI * 2 + Math.random() * 0.5;
-    particles.push({
-      x: cx,
-      y: cy,
-      vx: Math.cos(angle) * (4 + Math.random() * 6),
-      vy: Math.sin(angle) * (4 + Math.random() * 6),
-      life: 1,
-      size: 4 + Math.random() * 6
-    });
+  if (lives <= 1) {
+    playGameOverSound();
+  } else {
+    playDeathSound();
   }
-  playerDeathEffect = { x: player.x, y: player.y, startTime: Date.now(), particles };
+  playerDeathEffect = { x: player.x, y: player.y, startTime: Date.now() };
 }
 
 function initAliens() {
@@ -114,6 +181,7 @@ function resetGame() {
   level = 1;
   bullets = [];
   alienBullets = [];
+  explosions = [];
   alienDir = 1;
   alienStepDown = false;
   playerDeathEffect = null;
@@ -125,19 +193,20 @@ function resetGame() {
 function startGame() {
   gameState = 'playing';
   resetGame();
-  document.getElementById('message').classList.add('hidden');
+  document.getElementById('messageWrapper').classList.add('hidden');
 }
 
 function gameOver() {
   gameState = 'gameOver';
   document.getElementById('message').textContent = 'GAME OVER\nPRESS SPACE TO RESTART';
-  document.getElementById('message').classList.remove('hidden');
+  document.getElementById('messageWrapper').classList.remove('hidden');
 }
 
 function winLevel() {
   level++;
   bullets = [];
   alienBullets = [];
+  explosions = [];
   alienDir = 1;
   alienStepDown = false;
   initAliens();
@@ -147,7 +216,7 @@ function winLevel() {
 function winGame() {
   gameState = 'win';
   document.getElementById('message').textContent = 'YOU WIN!\nPRESS SPACE TO PLAY AGAIN';
-  document.getElementById('message').classList.remove('hidden');
+  document.getElementById('messageWrapper').classList.remove('hidden');
 }
 
 function updateUI() {
@@ -158,6 +227,13 @@ function updateUI() {
 
 function collides(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function getAlienSpeed() {
@@ -175,16 +251,23 @@ function getBottomRowAliens() {
 }
 
 function update(dt) {
+  // Update explosions (always, so they animate during death too)
+  const now = Date.now();
+  explosions = explosions.filter(exp => {
+    const elapsed = now - exp.startTime;
+    if (elapsed >= exp.duration) return false;
+    exp.particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15;
+      p.life = Math.max(0, 1 - elapsed / exp.duration * p.decay);
+    });
+    return true;
+  });
+
   // Handle death effect
   if (gameState === 'dying' && playerDeathEffect) {
     const elapsed = Date.now() - playerDeathEffect.startTime;
-    // Update particles
-    playerDeathEffect.particles.forEach(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.3;
-      p.life = Math.max(0, 1 - elapsed / DEATH_EFFECT_DURATION);
-    });
     if (elapsed >= DEATH_EFFECT_DURATION) {
       lives--;
       updateUI();
@@ -214,6 +297,7 @@ function update(dt) {
     for (const alien of aliens) {
       if (!alien.alive) continue;
       if (collides(b, alien)) {
+        triggerAlienExplosion(alien);
         alien.alive = false;
         score += ROW_POINTS[alien.row];
         return false;
@@ -242,7 +326,6 @@ function update(dt) {
   }
 
   // Alien bullets
-  const now = Date.now();
   if (now - lastAlienFire > ALIEN_FIRE_INTERVAL / level) {
     lastAlienFire = now;
     const bottomAliens = getBottomRowAliens();
@@ -380,28 +463,60 @@ function render() {
     ctx.fillRect(player.x, player.y, player.w, player.h);
   }
 
-  // Draw death effect
+  // Draw death effect - classic Space Invaders: blocky flash frames
   if (gameState === 'dying' && playerDeathEffect) {
     const elapsed = Date.now() - playerDeathEffect.startTime;
     const progress = Math.min(1, elapsed / DEATH_EFFECT_DURATION);
-    // Flash at impact point
-    ctx.fillStyle = `rgba(255, 100, 100, ${1 - progress})`;
-    ctx.beginPath();
-    ctx.arc(playerDeathEffect.x + PLAYER_W / 2, playerDeathEffect.y + PLAYER_H / 2, 20 + progress * 15, 0, Math.PI * 2);
-    ctx.fill();
-    // Particles
-    playerDeathEffect.particles.forEach(p => {
-      ctx.fillStyle = `rgba(0, 255, 100, ${p.life})`;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-      ctx.fill();
-    });
+    const cx = playerDeathEffect.x + PLAYER_W / 2;
+    const cy = playerDeathEffect.y + PLAYER_H / 2;
+    // Rapid white/green flicker (like original CRT phosphor sprite swap)
+    const frameRate = 50;
+    const frame = Math.floor((elapsed / 1000) * frameRate) % 4;
+    const flashWhite = frame < 2;
+    const fade = 1 - progress * progress;
+    if (fade > 0.05) {
+      ctx.fillStyle = flashWhite
+        ? `rgba(255, 255, 255, ${fade})`
+        : `rgba(0, 255, 0, ${fade * 0.7})`;
+      // Blocky explosion - chunky expanding rect + cross (arcade sprite style)
+      const size = 10 + progress * 28;
+      const w = Math.floor(size);
+      const h = Math.floor(size * 0.9);
+      ctx.fillRect(cx - w, cy - h, w * 2, h * 2);
+      const bar = Math.max(4, Math.floor(size * 0.35));
+      ctx.fillRect(cx - bar, cy - size, bar * 2, size * 2);
+      ctx.fillRect(cx - size, cy - bar, size * 2, bar * 2);
+    }
   }
 
   // Draw aliens (cool little space guys)
   aliens.forEach(a => {
     if (!a.alive) return;
     drawSpaceGuy(a);
+  });
+
+  // Draw alien explosions
+  explosions.forEach(exp => {
+    const elapsed = Date.now() - exp.startTime;
+    const progress = Math.min(1, elapsed / exp.duration);
+    // Bright flash at center (fades quickly, dialed down)
+    const flashAlpha = Math.max(0, 1 - progress * 4) * 0.6;
+    if (flashAlpha > 0) {
+      ctx.fillStyle = `rgba(255, 255, 200, ${flashAlpha})`;
+      ctx.beginPath();
+      ctx.arc(exp.x, exp.y, 8 + progress * 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Particle burst
+    exp.particles.forEach(p => {
+      ctx.fillStyle = hexToRgba(p.color, p.life);
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = p.life * 3;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
   });
 
   // Draw bullets

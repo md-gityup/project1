@@ -60,18 +60,50 @@ body {
   margin-left: auto;
 }
 
-.message {
+.message-wrapper {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-wrapper.hidden {
+  display: none;
+}
+
+.message-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.message {
+  position: relative;
+  z-index: 1;
   color: #00ff00;
   font-size: 16px;
   text-align: center;
-  text-shadow: 0 0 12px #00ff00;
+  text-shadow:
+    0 0 4px #000,
+    0 0 8px #000,
+    0 0 12px #00ff00,
+    0 0 20px #00ff00,
+    0 2px 0 #000,
+    0 -2px 0 #000,
+    2px 0 0 #000,
+    -2px 0 0 #000,
+    2px 2px 0 #000,
+    -2px -2px 0 #000;
   line-height: 2;
-}
-
-.message.hidden {
-  display: none;
+  padding: 24px 32px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 3px solid #00ff00;
+  white-space: pre-line;
 }
