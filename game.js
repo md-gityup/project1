@@ -46,13 +46,13 @@ let lastAlienFire = 0;
 const DEATH_EFFECT_DURATION = 800;
 let playerDeathEffect = null;
 
-// Alien explosion effects
+// Alien explosion effects (match animal row colors)
 const ALIEN_COLORS = [
-  { suit: '#ff4444', accent: '#ffaa44' },
-  { suit: '#ff8844', accent: '#ffdd44' },
-  { suit: '#ffcc44', accent: '#ff6644' },
-  { suit: '#44ff44', accent: '#88ff88' },
-  { suit: '#4488ff', accent: '#88ccff' }
+  { suit: '#e8c4a0', accent: '#c49a6c' },   // rabbit
+  { suit: '#e85c2e', accent: '#8b4513' },   // fox
+  { suit: '#8b7355', accent: '#5c4033' },   // deer
+  { suit: '#4a3728', accent: '#2d1f14' },   // bear
+  { suit: '#87ceeb', accent: '#5c9eb8' }    // bird
 ];
 const EXPLOSION_BASE_DURATION = 400;
 let explosions = [];
@@ -365,64 +365,128 @@ function update(dt) {
   updateUI();
 }
 
+// Classic pixel-art animal types (row 0–4: rabbit, fox, deer, bear, bird)
+const ANIMAL_COLORS = [
+  { main: '#e8c4a0', accent: '#c49a6c', eye: '#1a1a1a' },   // rabbit - tan
+  { main: '#e85c2e', accent: '#8b4513', eye: '#1a1a1a' },   // fox - orange
+  { main: '#8b7355', accent: '#5c4033', eye: '#1a1a1a' },    // deer - brown
+  { main: '#4a3728', accent: '#2d1f14', eye: '#1a1a1a' },   // bear - dark brown
+  { main: '#87ceeb', accent: '#5c9eb8', eye: '#1a1a1a' }    // bird - sky blue
+];
+
 function drawSpaceGuy(a) {
-  const colors = [
-    { suit: '#ff4444', visor: '#1a1a2e', eye: '#00ff88', accent: '#ffaa44' },  // red row
-    { suit: '#ff8844', visor: '#1a1a2e', eye: '#00ff88', accent: '#ffdd44' },  // orange
-    { suit: '#ffcc44', visor: '#1a1a2e', eye: '#00ff88', accent: '#ff6644' },  // yellow
-    { suit: '#44ff44', visor: '#1a1a2e', eye: '#ff4488', accent: '#88ff88' },  // green
-    { suit: '#4488ff', visor: '#1a1a2e', eye: '#ffcc00', accent: '#88ccff' }   // blue
-  ];
-  const c = colors[a.row];
+  const c = ANIMAL_COLORS[a.row];
   const cx = a.x + a.w / 2;
   const cy = a.y + a.h / 2;
+  const r = a.row;
 
-  // Body (rounded rectangle - little space suit)
-  ctx.fillStyle = c.suit;
+  // Shared: body blob (classic chunky pixel style)
+  ctx.fillStyle = c.main;
   ctx.beginPath();
-  const bodyW = a.w * 0.7;
-  const bodyH = a.h * 0.35;
-  roundRect(ctx, a.x + (a.w - bodyW) / 2, a.y + a.h - bodyH - 2, bodyW, bodyH, 4);
+  const bodyW = a.w * 0.65;
+  const bodyH = a.h * 0.5;
+  roundRect(ctx, a.x + (a.w - bodyW) / 2, a.y + a.h - bodyH - 2, bodyW, bodyH, 3);
   ctx.fill();
 
-  // Helmet/head (big round dome)
-  ctx.fillStyle = c.suit;
-  ctx.beginPath();
-  ctx.arc(cx, a.y + a.h * 0.42, a.w * 0.28, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Visor (dark face window)
-  ctx.fillStyle = c.visor;
-  ctx.beginPath();
-  ctx.arc(cx, a.y + a.h * 0.42, a.w * 0.2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eyes (cute glowing dots)
-  const eyeY = a.y + a.h * 0.38;
-  const eyeOff = a.w * 0.08;
-  ctx.fillStyle = c.eye;
-  ctx.shadowColor = c.eye;
-  ctx.shadowBlur = 4;
-  ctx.beginPath();
-  ctx.arc(cx - eyeOff, eyeY, 3, 0, Math.PI * 2);
-  ctx.arc(cx + eyeOff, eyeY, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // Antennae
-  ctx.strokeStyle = c.suit;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx - a.w * 0.15, a.y + a.h * 0.2);
-  ctx.lineTo(cx - a.w * 0.22, a.y + 2);
-  ctx.moveTo(cx + a.w * 0.15, a.y + a.h * 0.2);
-  ctx.lineTo(cx + a.w * 0.22, a.y + 2);
-  ctx.stroke();
-  ctx.fillStyle = c.accent;
-  ctx.beginPath();
-  ctx.arc(cx - a.w * 0.22, a.y + 2, 3, 0, Math.PI * 2);
-  ctx.arc(cx + a.w * 0.22, a.y + 2, 3, 0, Math.PI * 2);
-  ctx.fill();
+  // Row 0: Rabbit - long ears, round head
+  if (r === 0) {
+    ctx.fillStyle = c.main;
+    ctx.fillRect(cx - a.w * 0.12, a.y + 2, a.w * 0.1, a.h * 0.5);
+    ctx.fillRect(cx + a.w * 0.02, a.y + 2, a.w * 0.1, a.h * 0.5);
+    ctx.beginPath();
+    ctx.arc(cx, a.y + a.h * 0.45, a.w * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = c.accent;
+    ctx.fillRect(cx - a.w * 0.06, a.y + a.h * 0.38, 3, 3);
+    ctx.fillRect(cx + a.w * 0.03, a.y + a.h * 0.38, 3, 3);
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(cx - a.w * 0.06, a.y + a.h * 0.38, 2, 2);
+    ctx.fillRect(cx + a.w * 0.04, a.y + a.h * 0.38, 2, 2);
+  }
+  // Row 1: Fox - pointed ears, snout
+  else if (r === 1) {
+    ctx.fillStyle = c.main;
+    ctx.beginPath();
+    ctx.moveTo(cx - a.w * 0.2, a.y + a.h * 0.35);
+    ctx.lineTo(cx - a.w * 0.08, a.y + 4);
+    ctx.lineTo(cx, a.y + a.h * 0.25);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + a.w * 0.2, a.y + a.h * 0.35);
+    ctx.lineTo(cx + a.w * 0.08, a.y + 4);
+    ctx.lineTo(cx, a.y + a.h * 0.25);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, a.y + a.h * 0.42, a.w * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = c.accent;
+    ctx.fillRect(cx - a.w * 0.05, a.y + a.h * 0.5, a.w * 0.12, 4);
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(cx - a.w * 0.08, a.y + a.h * 0.35, 2, 2);
+    ctx.fillRect(cx + a.w * 0.05, a.y + a.h * 0.35, 2, 2);
+  }
+  // Row 2: Deer - antlers, elongated face
+  else if (r === 2) {
+    ctx.strokeStyle = c.accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - a.w * 0.15, a.y + a.h * 0.3);
+    ctx.lineTo(cx - a.w * 0.25, a.y + 4);
+    ctx.moveTo(cx - a.w * 0.12, a.y + a.h * 0.25);
+    ctx.lineTo(cx - a.w * 0.2, a.y + 8);
+    ctx.moveTo(cx + a.w * 0.15, a.y + a.h * 0.3);
+    ctx.lineTo(cx + a.w * 0.25, a.y + 4);
+    ctx.moveTo(cx + a.w * 0.12, a.y + a.h * 0.25);
+    ctx.lineTo(cx + a.w * 0.2, a.y + 8);
+    ctx.stroke();
+    ctx.fillStyle = c.main;
+    ctx.beginPath();
+    ctx.arc(cx, a.y + a.h * 0.45, a.w * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(cx - a.w * 0.04, a.y + a.h * 0.48, a.w * 0.08, 5);
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(cx - a.w * 0.07, a.y + a.h * 0.38, 2, 2);
+    ctx.fillRect(cx + a.w * 0.04, a.y + a.h * 0.38, 2, 2);
+  }
+  // Row 3: Bear - round ears, broad head
+  else if (r === 3) {
+    ctx.fillStyle = c.main;
+    ctx.beginPath();
+    ctx.arc(cx - a.w * 0.2, a.y + a.h * 0.3, a.w * 0.12, 0, Math.PI * 2);
+    ctx.arc(cx + a.w * 0.2, a.y + a.h * 0.3, a.w * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, a.y + a.h * 0.48, a.w * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = c.accent;
+    ctx.beginPath();
+    ctx.arc(cx, a.y + a.h * 0.52, a.w * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(cx - a.w * 0.08, a.y + a.h * 0.42, 2, 2);
+    ctx.fillRect(cx + a.w * 0.05, a.y + a.h * 0.42, 2, 2);
+  }
+  // Row 4: Bird - beak, wing bumps
+  else {
+    ctx.fillStyle = c.main;
+    ctx.beginPath();
+    ctx.arc(cx, a.y + a.h * 0.45, a.w * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = c.accent;
+    ctx.beginPath();
+    ctx.moveTo(cx + a.w * 0.2, a.y + a.h * 0.45);
+    ctx.lineTo(cx + a.w * 0.35, a.y + a.h * 0.42);
+    ctx.lineTo(cx + a.w * 0.2, a.y + a.h * 0.48);
+    ctx.fill();
+    ctx.fillStyle = c.main;
+    ctx.beginPath();
+    ctx.ellipse(cx - a.w * 0.15, a.y + a.h * 0.35, a.w * 0.08, a.h * 0.15, 0.3, 0, Math.PI * 2);
+    ctx.ellipse(cx + a.w * 0.1, a.y + a.h * 0.35, a.w * 0.08, a.h * 0.15, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = c.eye;
+    ctx.fillRect(cx - a.w * 0.06, a.y + a.h * 0.4, 2, 2);
+    ctx.fillRect(cx + a.w * 0.02, a.y + a.h * 0.4, 2, 2);
+  }
 }
 
 function roundRect(ctx, x, y, w, h, r) {
