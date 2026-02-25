@@ -36,6 +36,8 @@ let alienBullets = [];
 
 // Input
 const keys = {};
+let touchLeft = false;
+let touchRight = false;
 
 // Alien movement
 let alienDir = 1;
@@ -198,7 +200,8 @@ function startGame() {
 
 function gameOver() {
   gameState = 'gameOver';
-  document.getElementById('message').textContent = 'GAME OVER\nPRESS SPACE TO RESTART';
+  const restartHint = isTouchDevice() ? 'TAP FIRE TO RESTART' : 'PRESS SPACE TO RESTART';
+  document.getElementById('message').textContent = `GAME OVER\n${restartHint}`;
   document.getElementById('messageWrapper').classList.remove('hidden');
 }
 
@@ -215,7 +218,8 @@ function winLevel() {
 
 function winGame() {
   gameState = 'win';
-  document.getElementById('message').textContent = 'YOU WIN!\nPRESS SPACE TO PLAY AGAIN';
+  const playHint = isTouchDevice() ? 'TAP FIRE TO PLAY AGAIN' : 'PRESS SPACE TO PLAY AGAIN';
+  document.getElementById('message').textContent = `YOU WIN!\n${playHint}`;
   document.getElementById('messageWrapper').classList.remove('hidden');
 }
 
@@ -284,9 +288,9 @@ function update(dt) {
   }
   if (gameState !== 'playing') return;
 
-  // Player movement
-  if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.x -= player.speed;
-  if (keys['ArrowRight'] || keys['d'] || keys['D']) player.x += player.speed;
+  // Player movement (keyboard + touch)
+  if (keys['ArrowLeft'] || keys['a'] || keys['A'] || touchLeft) player.x -= player.speed;
+  if (keys['ArrowRight'] || keys['d'] || keys['D'] || touchRight) player.x += player.speed;
   player.x = Math.max(0, Math.min(W - PLAYER_W, player.x));
 
   // Player bullets
@@ -501,6 +505,42 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.quadraticCurveTo(x, y, x + r, y);
 }
 
+function drawPlayerShip() {
+  const x = player.x;
+  const y = player.y;
+  const w = player.w;
+  const h = player.h;
+  const cx = x + w / 2;
+
+  // Main hull - sleek triangular body (classic Space Invaders style)
+  ctx.fillStyle = '#00ff00';
+  ctx.beginPath();
+  ctx.moveTo(cx, y + 4);                    // nose
+  ctx.lineTo(x + w - 2, y + h - 4);         // bottom-right
+  ctx.lineTo(x + w * 0.65, y + h);          // right wing notch
+  ctx.lineTo(cx, y + h - 8);                // center notch (engine)
+  ctx.lineTo(x + w * 0.35, y + h);          // left wing notch
+  ctx.lineTo(x + 2, y + h - 4);             // bottom-left
+  ctx.closePath();
+  ctx.fill();
+
+  // Cockpit / canopy - cyan accent
+  ctx.fillStyle = '#00ddff';
+  ctx.beginPath();
+  ctx.moveTo(cx, y + 10);
+  ctx.lineTo(cx - 6, y + h - 12);
+  ctx.lineTo(cx + 6, y + h - 12);
+  ctx.closePath();
+  ctx.fill();
+
+  // Engine glow
+  ctx.fillStyle = '#33ff33';
+  ctx.shadowColor = '#00ff00';
+  ctx.shadowBlur = 6;
+  ctx.fillRect(cx - 3, y + h - 6, 6, 4);
+  ctx.shadowBlur = 0;
+}
+
 function shoot() {
   if (gameState !== 'playing') return;
   bullets.push({
@@ -523,8 +563,7 @@ function render() {
 
   // Draw player (not when dying)
   if (gameState === 'playing' || gameState === 'menu') {
-    ctx.fillStyle = '#00ff00';
-    ctx.fillRect(player.x, player.y, player.w, player.h);
+    drawPlayerShip();
   }
 
   // Draw death effect - classic Space Invaders: blocky flash frames
@@ -599,6 +638,14 @@ function gameLoop() {
 
 document.addEventListener('keydown', (e) => {
   keys[e.key] = true;
+  // Start from intro screen with Space or Enter
+  const introEl = document.getElementById('introScreen');
+  if (!introEl.classList.contains('hidden') && (e.key === ' ' || e.key === 'Enter')) {
+    e.preventDefault();
+    introEl.classList.add('hidden');
+    startGame();
+    return;
+  }
   if (e.key === ' ') {
     e.preventDefault();
     if (gameState === 'menu' || gameState === 'gameOver' || gameState === 'win') {
@@ -612,6 +659,62 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => {
   keys[e.key] = false;
 });
+
+// Intro screen - start game when button clicked
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('introScreen').classList.add('hidden');
+  startGame();
+});
+
+// Touch controls (iOS / mobile)
+function isTouchDevice() {
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+function setupTouchControls() {
+  if (!isTouchDevice()) return;
+
+  const touchControls = document.getElementById('touchControls');
+  const touchLeftBtn = document.getElementById('touchLeft');
+  const touchRightBtn = document.getElementById('touchRight');
+  const touchShootBtn = document.getElementById('touchShoot');
+  const introHint = document.getElementById('introHint');
+
+  if (touchControls) touchControls.classList.add('visible');
+  if (introHint) introHint.textContent = 'TAP arrows to move • TAP FIRE to shoot';
+
+  const setLeft = (v) => { touchLeft = v; };
+  const setRight = (v) => { touchRight = v; };
+
+  if (touchLeftBtn) {
+    touchLeftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setLeft(true); }, { passive: false });
+    touchLeftBtn.addEventListener('touchend', (e) => { e.preventDefault(); setLeft(false); }, { passive: false });
+    touchLeftBtn.addEventListener('mousedown', () => setLeft(true));
+    touchLeftBtn.addEventListener('mouseup', () => setLeft(false));
+    touchLeftBtn.addEventListener('mouseleave', () => setLeft(false));
+  }
+  if (touchRightBtn) {
+    touchRightBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setRight(true); }, { passive: false });
+    touchRightBtn.addEventListener('touchend', (e) => { e.preventDefault(); setRight(false); }, { passive: false });
+    touchRightBtn.addEventListener('mousedown', () => setRight(true));
+    touchRightBtn.addEventListener('mouseup', () => setRight(false));
+    touchRightBtn.addEventListener('mouseleave', () => setRight(false));
+  }
+  if (touchShootBtn) {
+    touchShootBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (gameState === 'menu' || gameState === 'gameOver' || gameState === 'win') startGame();
+      else shoot();
+    }, { passive: false });
+    touchShootBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (gameState === 'menu' || gameState === 'gameOver' || gameState === 'win') startGame();
+      else shoot();
+    });
+  }
+}
+
+setupTouchControls();
 
 initPlayer();
 initAliens();

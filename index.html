@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Space Invaders</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,8 +13,28 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="introScreen" class="intro-screen">
+    <div class="intro-scanlines"></div>
+    <div class="intro-stars"></div>
+    <div class="intro-content">
+      <div class="intro-title-wrap">
+        <h1 class="intro-title">SPACE INVADERS</h1>
+        <p class="intro-tagline">CLASSIC ARCADE • REBORN</p>
+      </div>
+      <div class="intro-invaders-row"></div>
+      <button id="startBtn" class="intro-start-btn" type="button">
+        <span class="btn-text">▶ START GAME</span>
+      </button>
+      <p class="intro-hint" id="introHint">A/D or ARROWS to move • SPACE to shoot</p>
+    </div>
+  </div>
   <div class="game-container">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="touch-controls" id="touchControls">
+      <button type="button" class="touch-btn touch-left" id="touchLeft" aria-label="Move left"></button>
+      <button type="button" class="touch-btn touch-right" id="touchRight" aria-label="Move right"></button>
+      <button type="button" class="touch-btn touch-shoot" id="touchShoot" aria-label="Shoot"></button>
+    </div>
     <div class="ui-overlay">
       <div class="hud">
         <span class="score">SCORE: <span id="score">0</span></span>
