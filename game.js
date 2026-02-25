@@ -48,6 +48,9 @@ let player = { x: 0, y: 0, w: PLAYER_W, h: PLAYER_H, speed: 6 };
 let aliens = [];
 let bullets = [];
 let alienBullets = [];
+let easterEggs = [];      // Special spawns: hostile or friendly
+let helperBullets = [];   // Bullets from friendly easter eggs
+let easterEggSpawnedThisLevel = false;
 
 // Input
 const keys = {};
@@ -61,6 +64,7 @@ const TOUCH_FIRE_COOLDOWN = 180;
 let alienDir = 1;
 let alienStepDown = false;
 let lastAlienFire = 0;
+let lastUpdateTime = 0;
 
 // Death effect - classic Space Invaders style (flash frames, no particles)
 const DEATH_EFFECT_DURATION = 800;
@@ -88,6 +92,8 @@ const deathSound = new Howl({ src: ['sounds/death.wav'], volume: 0.3, html5: isM
 const gameOverSound = new Howl({ src: ['sounds/gameover.wav'], volume: 0.3, html5: isMobile, preload: true });
 const startSound = new Howl({ src: ['sounds/start.wav'], volume: 0.25, html5: isMobile, preload: true });
 const levelCompleteSound = new Howl({ src: ['sounds/levelcomplete.wav'], volume: 0.35, html5: isMobile, preload: true });
+const easterEggFriendlySound = new Howl({ src: ['sounds/easteregg_friendly.wav'], volume: 0.3, html5: isMobile, preload: true });
+const easterEggFoeSound = new Howl({ src: ['sounds/easteregg_foe.wav'], volume: 0.3, html5: isMobile, preload: true });
 
 function unlockAudio() {
   try {
@@ -102,6 +108,42 @@ function playDeathSound() {
 
 function playGameOverSound() {
   gameOverSound.play();
+}
+
+// Easter egg: ONE per level, distinct look each level
+function maybeSpawnEasterEgg(alien) {
+  if (easterEggSpawnedThisLevel) return;
+  if (Math.random() > 0.06) return;  // 6% chance when you kill an alien
+  easterEggSpawnedThisLevel = true;
+
+  const cx = alien.x + alien.w / 2;
+  const cy = alien.y + alien.h / 2;
+  const phase = Math.random() * Math.PI * 2;
+  // One type per level: odd = friendly, even = hostile
+  const friendly = level % 2 === 1;
+
+  easterEggs.push({
+    x: cx - 15,
+    y: cy,
+    w: 30,
+    h: 24,
+    vx: 0,
+    vy: 0.5 + Math.random() * 0.3,
+    friendly,
+    row: alien.row,
+    phase,
+    flutterAmp: 1.2 + Math.random() * 0.6,
+    flutterFreq: 0.03,
+    fireCooldown: 0,
+    eggLevel: level,
+    alive: true
+  });
+
+  if (friendly) {
+    easterEggFriendlySound.play();
+  } else {
+    easterEggFoeSound.play();
+  }
 }
 
 function triggerAlienExplosion(alien) {
@@ -186,6 +228,9 @@ function resetGame() {
   level = 1;
   bullets = [];
   alienBullets = [];
+  easterEggs = [];
+  helperBullets = [];
+  easterEggSpawnedThisLevel = false;
   explosions = [];
   alienDir = 1;
   alienStepDown = false;
@@ -217,6 +262,9 @@ function winLevel() {
   level++;
   bullets = [];
   alienBullets = [];
+  easterEggs = [];
+  helperBullets = [];
+  easterEggSpawnedThisLevel = false;
   explosions = [];
   alienDir = 1;
   alienStepDown = false;
@@ -265,8 +313,10 @@ function getBottomRowAliens() {
 }
 
 function update(dt) {
-  // Update explosions (always, so they animate during death too)
   const now = Date.now();
+  dt = dt || (lastUpdateTime ? Math.min(50, now - lastUpdateTime) : 16);
+  lastUpdateTime = now;
+  // Update explosions (always, so they animate during death too)
   explosions = explosions.filter(exp => {
     const elapsed = now - exp.startTime;
     if (elapsed >= exp.duration) return false;
@@ -321,9 +371,19 @@ function update(dt) {
     for (const alien of aliens) {
       if (!alien.alive) continue;
       if (collides(b, alien)) {
+        maybeSpawnEasterEgg(alien);
         triggerAlienExplosion(alien);
         alien.alive = false;
         score += ROW_POINTS[alien.row];
+        return false;
+      }
+    }
+    for (const egg of easterEggs) {
+      if (!egg.alive || egg.friendly) continue;
+      if (collides(b, egg)) {
+        triggerAlienExplosion({ x: egg.x, y: egg.y, w: egg.w, h: egg.h, row: egg.row });
+        egg.alive = false;
+        score += 50;
         return false;
       }
     }
@@ -372,11 +432,90 @@ function update(dt) {
   }
 
   alienBullets = alienBullets.filter(b => {
-    b.y += b.dy;
-    if (b.y > H) return false;
+    if (b.vx !== undefined) {
+      b.x += b.vx;
+      b.y += b.vy;
+    } else {
+      b.y += b.dy;
+    }
+    if (b.y > H || b.y < 0 || b.x < 0 || b.x > W) return false;
     if (collides(b, player)) {
       triggerPlayerDeath();
       return false;
+    }
+    return true;
+  });
+
+  // Easter eggs: flutter down, shoot, collide
+  const t = now / 1000;
+  easterEggs.forEach(egg => {
+    if (!egg.alive) return;
+    egg.x += Math.sin(t * 4 + egg.phase) * egg.flutterAmp;
+    egg.y += egg.vy;
+    egg.fireCooldown = Math.max(0, egg.fireCooldown - dt);
+    if (egg.x < 0 || egg.x + egg.w > W) egg.x = Math.max(0, Math.min(W - egg.w, egg.x));
+    if (egg.y > H) { egg.alive = false; return; }
+    if (collides(egg, player) && !egg.friendly) {
+      triggerPlayerDeath();
+      egg.alive = false;
+      return;
+    }
+    if (egg.fireCooldown <= 0) {
+      const interval = 800 - level * 40;
+      if (egg.friendly) {
+        const alive = aliens.filter(a => a.alive);
+        let nearest = null;
+        let best = Infinity;
+        for (const a of alive) {
+          const dx = (a.x + a.w / 2) - (egg.x + egg.w / 2);
+          const dy = a.y - egg.y;
+          const d = dx * dx + dy * dy;
+          if (d < best) { best = d; nearest = a; }
+        }
+        if (nearest) {
+          const ex = egg.x + egg.w / 2 - BULLET_W / 2;
+          const ey = egg.y + egg.h;
+          const ax = nearest.x + nearest.w / 2;
+          const ay = nearest.y + nearest.h / 2;
+          const angle = Math.atan2(ay - (ey + BULLET_H), ax - ex);
+          const speed = 5;
+          helperBullets.push({
+            x: ex, y: ey, w: BULLET_W, h: BULLET_H,
+            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed
+          });
+          egg.fireCooldown = interval;
+        }
+      } else {
+        const px = player.x + PLAYER_W / 2;
+        const py = player.y;
+        const ex = egg.x + egg.w / 2 - BULLET_W / 2;
+        const ey = egg.y + egg.h;
+        const angle = Math.atan2(py - ey, px - ex);
+        const speed = bulletSpeed * 1.2;
+        alienBullets.push({
+          x: ex, y: ey, w: BULLET_W, h: BULLET_H,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed
+        });
+        egg.fireCooldown = interval;
+      }
+    }
+  });
+  easterEggs = easterEggs.filter(e => e.alive);
+
+  helperBullets = helperBullets.filter(b => {
+    b.x += b.vx;
+    b.y += b.vy;
+    if (b.y < 0 || b.y > H || b.x < 0 || b.x > W) return false;
+    for (const alien of aliens) {
+      if (!alien.alive) continue;
+      if (collides(b, alien)) {
+        maybeSpawnEasterEgg(alien);
+        triggerAlienExplosion(alien);
+        alien.alive = false;
+        score += ROW_POINTS[alien.row];
+        return false;
+      }
     }
     return true;
   });
@@ -519,6 +658,81 @@ function drawSpaceGuy(a) {
   }
 }
 
+// Easter egg visuals - each level looks different
+const EGG_STYLES = [
+  { fill: '#00ff88', stroke: '#00cc66', shape: 'diamond' },   // L1: green
+  { fill: '#ff4466', stroke: '#cc2244', shape: 'star' },     // L2: red
+  { fill: '#4488ff', stroke: '#2266cc', shape: 'hex' },      // L3: blue
+  { fill: '#ffaa00', stroke: '#cc8800', shape: 'circle' },   // L4: orange
+  { fill: '#aa44ff', stroke: '#8822cc', shape: 'triangle' }, // L5: purple
+  { fill: '#00dddd', stroke: '#00aaaa', shape: 'diamond' },  // L6: cyan
+  { fill: '#ff88cc', stroke: '#cc6699', shape: 'star' },     // L7: pink
+  { fill: '#88ff44', stroke: '#66cc22', shape: 'hex' },      // L8: lime
+];
+
+function drawEasterEgg(egg) {
+  const style = EGG_STYLES[(egg.eggLevel - 1) % EGG_STYLES.length];
+  const cx = egg.x + egg.w / 2;
+  const cy = egg.y + egg.h / 2;
+  const r = Math.min(egg.w, egg.h) * 0.4;
+
+  ctx.save();
+  ctx.shadowColor = style.fill;
+  ctx.shadowBlur = egg.friendly ? 10 : 8;
+  ctx.strokeStyle = style.stroke;
+  ctx.lineWidth = 2;
+  ctx.fillStyle = style.fill;
+
+  ctx.beginPath();
+  if (style.shape === 'diamond') {
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r, cy);
+    ctx.lineTo(cx, cy + r);
+    ctx.lineTo(cx - r, cy);
+  } else if (style.shape === 'star') {
+    for (let i = 0; i < 5; i++) {
+      const a = (i * 4 * Math.PI / 5) - Math.PI / 2;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      ctx[i === 0 ? 'moveTo' : 'lineTo'](x, y);
+    }
+  } else if (style.shape === 'hex') {
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI / 3) - Math.PI / 6;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      ctx[i === 0 ? 'moveTo' : 'lineTo'](x, y);
+    }
+  } else if (style.shape === 'circle') {
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  } else if (style.shape === 'triangle') {
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r, cy + r * 0.6);
+    ctx.lineTo(cx - r, cy + r * 0.6);
+  } else {
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Friend/foe indicator: ring + label
+  const friendColor = '#00ff88';
+  const foeColor = '#ff4444';
+  ctx.strokeStyle = egg.friendly ? friendColor : foeColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 6, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.font = '10px "Press Start 2P"';
+  ctx.fillStyle = egg.friendly ? friendColor : foeColor;
+  ctx.textAlign = 'center';
+  ctx.fillText(egg.friendly ? 'FRIEND' : 'FOE', cx, egg.y - 4);
+
+  ctx.restore();
+}
+
 function roundRect(ctx, x, y, w, h, r) {
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + w - r, y);
@@ -623,6 +837,16 @@ function render() {
     if (!a.alive) return;
     drawSpaceGuy(a);
   });
+
+  // Draw easter eggs - distinct look per level
+  easterEggs.forEach(egg => {
+    if (!egg.alive) return;
+    drawEasterEgg(egg);
+  });
+
+  // Draw helper bullets (from friendly eggs)
+  ctx.fillStyle = '#00ff88';
+  helperBullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
 
   // Draw alien explosions
   explosions.forEach(exp => {

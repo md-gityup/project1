@@ -26,4 +26,6 @@ create_wav('sounds/death.wav', 220, 55, 0.18, 0.25)
 create_wav('sounds/gameover.wav', 330, 55, 0.55, 0.2)
 create_wav('sounds/start.wav', 200, 500, 0.12, 0.2)  # short ascending "ready" beep
 create_wav('sounds/levelcomplete.wav', 440, 880, 0.22, 0.28)  # satisfying level-up ding
-print('Created sounds/death.wav, sounds/gameover.wav, sounds/start.wav, sounds/levelcomplete.wav')
+create_wav('sounds/easteregg_friendly.wav', 440, 880, 0.18, 0.22)  # bright ascending chime
+create_wav('sounds/easteregg_foe.wav', 180, 65, 0.35, 0.2)  # dark descending growl
+print('Created sounds/death.wav, sounds/gameover.wav, sounds/start.wav, sounds/levelcomplete.wav, sounds/easteregg_friendly.wav, sounds/easteregg_foe.wav')
