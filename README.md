@@ -7,14 +7,22 @@ A classic Space Invaders-style arcade game built with vanilla HTML, CSS, and Jav
 - **A / D** or **Arrow keys** - Move left/right
 - **Space** - Shoot / Start game
 
-## Run Instructions
+## Setup (first time)
 
-**Option 1 (simplest):** Double-click `index.html` or drag it into your browser to open directly.
-
-**Option 2 (local server):** From the project folder, run:
+Generate sound files:
 
 ```bash
-python3 -m http.server 3000
+python3 create-sounds.py
 ```
 
-Then visit `http://localhost:3000`.
+## Run Instructions
+
+**For iPhone/iPad:** You must use a local server—opening the file directly will not play sound.
+
+1. From the project folder, run:
+   ```bash
+   python3 -m http.server 3000
+   ```
+2. On your phone (same Wi‑Fi), open `http://YOUR-COMPUTER-IP:3000` (e.g. `http://192.168.1.5:3000`)
+
+**Desktop:** Double-click `index.html` or run the server and visit `http://localhost:3000`.
