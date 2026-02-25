@@ -8,33 +8,36 @@ html {
   /* iOS: prevent overscroll bounce, use full viewport height */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
-  /* Support for iOS safe area and dynamic viewport */
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* iOS Safari: -webkit-fill-available fixes 100vh not filling visible viewport */
+  height: 100%;
+  height: -webkit-fill-available;
 }
 
 body {
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   min-height: 100dvh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   background: #0a0a0f;
   overflow: hidden;
   font-family: 'Press Start 2P', monospace;
   /* iOS: prevent tap highlight, 300ms delay */
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  /* Safe area insets for notched iPhones */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 .game-container {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
-  height: 100%;
-  /* Use full viewport including safe areas for edge-to-edge gameplay */
+  /* iOS: explicit viewport height + -webkit-fill-available for full-screen fill */
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  /* Edge-to-edge: extend into safe areas (notch, home indicator) */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   touch-action: manipulation;
   -webkit-touch-callout: none;

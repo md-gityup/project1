@@ -3,6 +3,21 @@ const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
 
+// iOS Safari: force full viewport height (100vh is unreliable when address bar shows/hides)
+function setFullViewportHeight() {
+  const container = document.querySelector('.game-container');
+  if (container) {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+    container.style.height = `${window.innerHeight}px`;
+  }
+}
+setFullViewportHeight();
+window.addEventListener('resize', setFullViewportHeight);
+window.addEventListener('orientationchange', () => {
+  setTimeout(setFullViewportHeight, 100);
+});
+
 // Game state
 let gameState = 'menu';
 let score = 0;
