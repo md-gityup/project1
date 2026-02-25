@@ -87,6 +87,7 @@ const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const deathSound = new Howl({ src: ['sounds/death.wav'], volume: 0.3, html5: isMobile, preload: true });
 const gameOverSound = new Howl({ src: ['sounds/gameover.wav'], volume: 0.3, html5: isMobile, preload: true });
 const startSound = new Howl({ src: ['sounds/start.wav'], volume: 0.25, html5: isMobile, preload: true });
+const levelCompleteSound = new Howl({ src: ['sounds/levelcomplete.wav'], volume: 0.35, html5: isMobile, preload: true });
 
 function unlockAudio() {
   try {
@@ -207,7 +208,12 @@ function gameOver() {
   document.getElementById('messageWrapper').classList.remove('hidden');
 }
 
+function playLevelCompleteSound() {
+  levelCompleteSound.play();
+}
+
 function winLevel() {
+  playLevelCompleteSound();
   level++;
   bullets = [];
   alienBullets = [];
@@ -244,7 +250,9 @@ function hexToRgba(hex, alpha) {
 
 function getAlienSpeed() {
   const aliveCount = aliens.filter(a => a.alive).length;
-  return BASE_ALIEN_SPEED + (55 - aliveCount) * 0.02 + level * 0.2;
+  // Level 2+: aliens move faster (slightly harder each level)
+  const levelBonus = level >= 2 ? (level - 1) * 0.35 : level * 0.2;
+  return BASE_ALIEN_SPEED + (55 - aliveCount) * 0.02 + levelBonus;
 }
 
 function getBottomRowAliens() {
@@ -341,8 +349,14 @@ function update(dt) {
     });
   }
 
-  // Alien bullets
-  if (now - lastAlienFire > ALIEN_FIRE_INTERVAL / level) {
+  // Alien bullets (level 2+: fire more often and bullets move faster)
+  const fireInterval = level >= 2
+    ? ALIEN_FIRE_INTERVAL / (level * 1.2)
+    : ALIEN_FIRE_INTERVAL / level;
+  const bulletSpeed = level >= 2
+    ? ALIEN_BULLET_SPEED * (1 + (level - 1) * 0.12)
+    : ALIEN_BULLET_SPEED;
+  if (now - lastAlienFire > fireInterval) {
     lastAlienFire = now;
     const bottomAliens = getBottomRowAliens();
     if (bottomAliens.length > 0) {
@@ -352,7 +366,7 @@ function update(dt) {
         y: shooter.y + shooter.h,
         w: BULLET_W,
         h: BULLET_H,
-        dy: ALIEN_BULLET_SPEED
+        dy: bulletSpeed
       });
     }
   }

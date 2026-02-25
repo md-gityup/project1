@@ -25,4 +25,5 @@ os.makedirs('sounds', exist_ok=True)
 create_wav('sounds/death.wav', 220, 55, 0.18, 0.25)
 create_wav('sounds/gameover.wav', 330, 55, 0.55, 0.2)
 create_wav('sounds/start.wav', 200, 500, 0.12, 0.2)  # short ascending "ready" beep
-print('Created sounds/death.wav, sounds/gameover.wav, sounds/start.wav')
+create_wav('sounds/levelcomplete.wav', 440, 880, 0.22, 0.28)  # satisfying level-up ding
+print('Created sounds/death.wav, sounds/gameover.wav, sounds/start.wav, sounds/levelcomplete.wav')
