@@ -91,30 +91,12 @@ function getAudioContext() {
   return sharedAudioCtx;
 }
 
-/** Minimal silent MP3 - more reliable than WAV on iOS Safari */
-const SILENT_MP3 = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDkAAAAAAAAAGw9wrNaQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+MYxAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxDsAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxHYAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
-
 /** Call on first user interaction (e.g. tap START). Required for iOS Safari. */
 function unlockAudio() {
   try {
-    // 1. AudioSession API (iOS 16.4+): bypass mute switch - treat as music playback
-    if ('audioSession' in navigator) {
-      navigator.audioSession.type = 'playback';
-    }
-  } catch (_) {}
-
-  try {
-    // 2. Silent HTML5 audio - signals media playback intent, unlocks Web Audio on iOS
-    const el = new Audio(SILENT_MP3);
-    el.volume = 0;
-    el.play().catch(() => {});
-  } catch (_) {}
-
-  try {
-    // 3. Create & resume Web Audio context (must be in same call stack as user gesture)
     const ctx = getAudioContext();
     if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+      ctx.resume();
     }
   } catch (_) {}
 }
@@ -779,7 +761,6 @@ function setupTouchControls() {
     }
     if (gameState === 'playing' || gameState === 'dying') {
       e.preventDefault();
-      unlockAudio(); // Unlock on first touch during play (e.g. if started via keyboard)
     }
 
     for (const t of e.changedTouches) {
