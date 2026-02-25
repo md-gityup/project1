@@ -56,81 +56,8 @@ body {
   height: auto;
   max-width: 800px;
   max-height: min(100vh, 100dvh);
-}
-
-/* ========== TOUCH CONTROLS (iOS / mobile) ========== */
-.touch-controls {
-  display: none;
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.touch-controls.visible {
-  display: block;
-}
-
-.touch-btn {
-  position: absolute;
-  pointer-events: auto;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  border: none;
-  background: rgba(0, 255, 0, 0.2);
-  border: 3px solid rgba(0, 255, 0, 0.6);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: background 0.1s, transform 0.1s;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.touch-btn:active {
-  background: rgba(0, 255, 0, 0.4);
-  transform: scale(0.95);
-}
-
-.touch-left {
-  left: env(safe-area-inset-left, 16px);
-  bottom: env(safe-area-inset-bottom, 24px);
-  width: min(80px, 22vw);
-  height: min(80px, 22vw);
-  min-width: 56px;
-  min-height: 56px;
-  font-size: clamp(18px, 5vw, 24px);
-  color: rgba(0, 255, 0, 0.9);
-}
-.touch-left::before { content: '◀'; }
-
-.touch-right {
-  left: calc(env(safe-area-inset-left, 16px) + 88px);
-  bottom: env(safe-area-inset-bottom, 24px);
-  width: min(80px, 22vw);
-  height: min(80px, 22vw);
-  min-width: 56px;
-  min-height: 56px;
-  font-size: clamp(18px, 5vw, 24px);
-  color: rgba(0, 255, 0, 0.9);
-}
-.touch-right::before { content: '▶'; }
-
-.touch-shoot {
-  right: env(safe-area-inset-right, 16px);
-  bottom: env(safe-area-inset-bottom, 24px);
-  width: min(100px, 28vw);
-  height: min(80px, 22vw);
-  min-width: 64px;
-  min-height: 56px;
-  font-size: clamp(10px, 3vw, 14px);
-  color: rgba(0, 255, 0, 0.9);
-}
-.touch-shoot::before { content: 'FIRE'; }
-
-@media (hover: hover) and (pointer: fine) {
-  .touch-controls {
-    display: none !important;
-  }
+  /* Prevent scroll/zoom when using touch controls */
+  touch-action: none;
 }
 
 .ui-overlay {

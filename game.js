@@ -36,8 +36,10 @@ let alienBullets = [];
 
 // Input
 const keys = {};
-let touchLeft = false;
-let touchRight = false;
+let touchTargetX = null;  // First finger: ship follows this x position
+let touchFire = false;   // Second finger: fire while held
+let lastTouchFireTime = 0;
+const TOUCH_FIRE_COOLDOWN = 180;
 
 // Alien movement
 let alienDir = 1;
@@ -200,7 +202,7 @@ function startGame() {
 
 function gameOver() {
   gameState = 'gameOver';
-  const restartHint = isTouchDevice() ? 'TAP FIRE TO RESTART' : 'PRESS SPACE TO RESTART';
+  const restartHint = isTouchDevice() ? 'TAP TO RESTART' : 'PRESS SPACE TO RESTART';
   document.getElementById('message').textContent = `GAME OVER\n${restartHint}`;
   document.getElementById('messageWrapper').classList.remove('hidden');
 }
@@ -218,7 +220,7 @@ function winLevel() {
 
 function winGame() {
   gameState = 'win';
-  const playHint = isTouchDevice() ? 'TAP FIRE TO PLAY AGAIN' : 'PRESS SPACE TO PLAY AGAIN';
+  const playHint = isTouchDevice() ? 'TAP TO PLAY AGAIN' : 'PRESS SPACE TO PLAY AGAIN';
   document.getElementById('message').textContent = `YOU WIN!\n${playHint}`;
   document.getElementById('messageWrapper').classList.remove('hidden');
 }
@@ -289,9 +291,23 @@ function update(dt) {
   if (gameState !== 'playing') return;
 
   // Player movement (keyboard + touch)
-  if (keys['ArrowLeft'] || keys['a'] || keys['A'] || touchLeft) player.x -= player.speed;
-  if (keys['ArrowRight'] || keys['d'] || keys['D'] || touchRight) player.x += player.speed;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.x -= player.speed;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) player.x += player.speed;
+  // Touch: first finger moves ship to follow finger position
+  if (touchTargetX !== null) {
+    const centerX = touchTargetX - PLAYER_W / 2;
+    player.x = Math.max(0, Math.min(W - PLAYER_W, centerX));
+  }
   player.x = Math.max(0, Math.min(W - PLAYER_W, player.x));
+
+  // Touch fire: second finger (with cooldown)
+  if (touchFire && gameState === 'playing') {
+    const now = Date.now();
+    if (now - lastTouchFireTime >= TOUCH_FIRE_COOLDOWN) {
+      lastTouchFireTime = now;
+      shoot();
+    }
+  }
 
   // Player bullets
   bullets = bullets.filter(b => {
@@ -666,52 +682,68 @@ document.getElementById('startBtn').addEventListener('click', () => {
   startGame();
 });
 
-// Touch controls (iOS / mobile)
+// Touch controls (iOS / mobile): finger 1 = move ship, finger 2 = fire
 function isTouchDevice() {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+function touchToCanvasX(clientX) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  return (clientX - rect.left) * scaleX;
 }
 
 function setupTouchControls() {
   if (!isTouchDevice()) return;
 
-  const touchControls = document.getElementById('touchControls');
-  const touchLeftBtn = document.getElementById('touchLeft');
-  const touchRightBtn = document.getElementById('touchRight');
-  const touchShootBtn = document.getElementById('touchShoot');
   const introHint = document.getElementById('introHint');
+  if (introHint) introHint.textContent = 'DRAG to move • SECOND FINGER to fire';
 
-  if (touchControls) touchControls.classList.add('visible');
-  if (introHint) introHint.textContent = 'TAP arrows to move • TAP FIRE to shoot';
+  const touches = new Map(); // id -> { x, isFire }
 
-  const setLeft = (v) => { touchLeft = v; };
-  const setRight = (v) => { touchRight = v; };
+  function updateFromTouches() {
+    const arr = Array.from(touches.values());
+    touchTargetX = arr.length >= 1 ? arr[0].x : null;
+    touchFire = arr.length >= 2;
+  }
 
-  if (touchLeftBtn) {
-    touchLeftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setLeft(true); }, { passive: false });
-    touchLeftBtn.addEventListener('touchend', (e) => { e.preventDefault(); setLeft(false); }, { passive: false });
-    touchLeftBtn.addEventListener('mousedown', () => setLeft(true));
-    touchLeftBtn.addEventListener('mouseup', () => setLeft(false));
-    touchLeftBtn.addEventListener('mouseleave', () => setLeft(false));
-  }
-  if (touchRightBtn) {
-    touchRightBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setRight(true); }, { passive: false });
-    touchRightBtn.addEventListener('touchend', (e) => { e.preventDefault(); setRight(false); }, { passive: false });
-    touchRightBtn.addEventListener('mousedown', () => setRight(true));
-    touchRightBtn.addEventListener('mouseup', () => setRight(false));
-    touchRightBtn.addEventListener('mouseleave', () => setRight(false));
-  }
-  if (touchShootBtn) {
-    touchShootBtn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      if (gameState === 'menu' || gameState === 'gameOver' || gameState === 'win') startGame();
-      else shoot();
-    }, { passive: false });
-    touchShootBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (gameState === 'menu' || gameState === 'gameOver' || gameState === 'win') startGame();
-      else shoot();
-    });
-  }
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (gameState === 'menu' || gameState === 'gameOver' || gameState === 'win') {
+      startGame();
+    }
+    for (const t of e.changedTouches) {
+      const x = touchToCanvasX(t.clientX);
+      touches.set(t.identifier, { x, isFire: touches.size >= 1 });
+      updateFromTouches();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      const info = touches.get(t.identifier);
+      if (info) {
+        info.x = touchToCanvasX(t.clientX);
+        updateFromTouches();
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      touches.delete(t.identifier);
+      updateFromTouches();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchcancel', (e) => {
+    for (const t of e.changedTouches) {
+      touches.delete(t.identifier);
+      updateFromTouches();
+    }
+  }, { passive: false });
 }
 
 setupTouchControls();
