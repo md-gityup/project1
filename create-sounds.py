@@ -24,4 +24,5 @@ def create_wav(filename, start_freq, end_freq, duration_sec, volume):
 os.makedirs('sounds', exist_ok=True)
 create_wav('sounds/death.wav', 220, 55, 0.18, 0.25)
 create_wav('sounds/gameover.wav', 330, 55, 0.55, 0.2)
-print('Created sounds/death.wav and sounds/gameover.wav')
+create_wav('sounds/start.wav', 200, 500, 0.12, 0.2)  # short ascending "ready" beep
+print('Created sounds/death.wav, sounds/gameover.wav, sounds/start.wav')

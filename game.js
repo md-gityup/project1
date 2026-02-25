@@ -51,8 +51,9 @@ let alienBullets = [];
 
 // Input
 const keys = {};
-let touchTargetX = null;  // First finger: ship follows this x position
-let touchFire = false;   // Second finger: fire while held
+let touchActive = false;   // First finger: dragging to move ship
+let lastTouchX = null;     // Last known touch X (for delta-based movement)
+let touchFire = false;     // Second finger: fire while held
 let lastTouchFireTime = 0;
 const TOUCH_FIRE_COOLDOWN = 180;
 
@@ -85,14 +86,13 @@ function initPlayer() {
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const deathSound = new Howl({ src: ['sounds/death.wav'], volume: 0.3, html5: isMobile, preload: true });
 const gameOverSound = new Howl({ src: ['sounds/gameover.wav'], volume: 0.3, html5: isMobile, preload: true });
+const startSound = new Howl({ src: ['sounds/start.wav'], volume: 0.25, html5: isMobile, preload: true });
 
 function unlockAudio() {
   try {
     if ('audioSession' in navigator) navigator.audioSession.type = 'playback';
   } catch (_) {}
-  deathSound.volume(0.05);
-  deathSound.play();
-  deathSound.volume(0.3);
+  startSound.play();
 }
 
 function playDeathSound() {
@@ -293,11 +293,7 @@ function update(dt) {
   // Player movement (keyboard + touch)
   if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.x -= player.speed;
   if (keys['ArrowRight'] || keys['d'] || keys['D']) player.x += player.speed;
-  // Touch: first finger moves ship to follow finger position
-  if (touchTargetX !== null) {
-    const centerX = touchTargetX - PLAYER_W / 2;
-    player.x = Math.max(0, Math.min(W - PLAYER_W, centerX));
-  }
+  // Touch: first finger moves ship by delta in handleTouchMove (ship stays put on touch start)
   player.x = Math.max(0, Math.min(W - PLAYER_W, player.x));
 
   // Touch fire: second finger (with cooldown)
@@ -707,10 +703,11 @@ function setupTouchControls() {
   if (introHint) introHint.textContent = 'DRAG to move • SECOND FINGER to fire';
 
   const touches = new Map(); // id -> { x, isFire }
+  let moveTouchId = null;    // id of first finger (moves ship)
 
   function updateFromTouches() {
     const arr = Array.from(touches.values());
-    touchTargetX = arr.length >= 1 ? arr[0].x : null;
+    touchActive = arr.length >= 1;
     touchFire = arr.length >= 2;
   }
 
@@ -730,7 +727,12 @@ function setupTouchControls() {
 
     for (const t of e.changedTouches) {
       const x = touchToCanvasX(t.clientX);
+      const isFirst = touches.size === 0;
       touches.set(t.identifier, { x, isFire: touches.size >= 1 });
+      if (isFirst) {
+        moveTouchId = t.identifier;
+        lastTouchX = x;  // Anchor for delta; ship does NOT jump to finger
+      }
       updateFromTouches();
     }
   }
@@ -742,7 +744,14 @@ function setupTouchControls() {
     for (const t of e.changedTouches) {
       const info = touches.get(t.identifier);
       if (info) {
-        info.x = touchToCanvasX(t.clientX);
+        const newX = touchToCanvasX(t.clientX);
+        // Delta-based movement: ship moves with finger drag, not to finger position
+        if (t.identifier === moveTouchId && lastTouchX !== null && gameState === 'playing') {
+          const delta = newX - lastTouchX;
+          player.x = Math.max(0, Math.min(W - PLAYER_W, player.x + delta));
+        }
+        info.x = newX;
+        if (t.identifier === moveTouchId) lastTouchX = newX;
         updateFromTouches();
       }
     }
@@ -753,15 +762,34 @@ function setupTouchControls() {
       e.preventDefault();
     }
     for (const t of e.changedTouches) {
+      if (t.identifier === moveTouchId) {
+        moveTouchId = null;
+        lastTouchX = null;
+      }
       touches.delete(t.identifier);
       updateFromTouches();
+      // Reassign move finger if another touch remains
+      if (touches.size > 0 && moveTouchId === null) {
+        moveTouchId = touches.keys().next().value;
+        const info = touches.get(moveTouchId);
+        if (info) lastTouchX = info.x;
+      }
     }
   }
 
   function handleTouchCancel(e) {
     for (const t of e.changedTouches) {
+      if (t.identifier === moveTouchId) {
+        moveTouchId = null;
+        lastTouchX = null;
+      }
       touches.delete(t.identifier);
       updateFromTouches();
+      if (touches.size > 0 && moveTouchId === null) {
+        moveTouchId = touches.keys().next().value;
+        const info = touches.get(moveTouchId);
+        if (info) lastTouchX = info.x;
+      }
     }
   }
 
