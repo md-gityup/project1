@@ -30,14 +30,12 @@ body {
 }
 
 .game-container {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  position: fixed;
+  inset: 0;
   width: 100%;
-  max-width: 100vw;
-  max-height: 100vh;
-  max-height: 100dvh;
+  height: 100%;
+  /* Use full viewport including safe areas for edge-to-edge gameplay */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   touch-action: manipulation;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
@@ -46,16 +44,13 @@ body {
 
 #gameCanvas {
   display: block;
+  width: 100%;
+  height: 100%;
   background: #000;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  /* Fill available space while maintaining 800:600 aspect ratio */
-  width: 100%;
-  height: auto;
-  max-width: 800px;
-  max-height: min(100vh, 100dvh);
   /* Prevent scroll/zoom when using touch controls */
   touch-action: none;
 }
