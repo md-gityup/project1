@@ -689,6 +689,7 @@ function isTouchDevice() {
 
 function touchToCanvasX(clientX) {
   const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0) return W / 2;
   const scaleX = canvas.width / rect.width;
   return (clientX - rect.left) * scaleX;
 }
@@ -707,20 +708,30 @@ function setupTouchControls() {
     touchFire = arr.length >= 2;
   }
 
-  canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    if (gameState === 'menu' || gameState === 'gameOver' || gameState === 'win') {
+  function handleTouchStart(e) {
+    // Only handle when game is active (playing/dying) or on restart screen
+    const introVisible = !document.getElementById('introScreen').classList.contains('hidden');
+    if (introVisible) return; // Let START button handle it
+
+    if (gameState === 'gameOver' || gameState === 'win') {
+      e.preventDefault();
       startGame();
     }
+    if (gameState === 'playing' || gameState === 'dying') {
+      e.preventDefault();
+    }
+
     for (const t of e.changedTouches) {
       const x = touchToCanvasX(t.clientX);
       touches.set(t.identifier, { x, isFire: touches.size >= 1 });
       updateFromTouches();
     }
-  }, { passive: false });
+  }
 
-  canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
+  function handleTouchMove(e) {
+    if (gameState === 'playing' || gameState === 'dying') {
+      e.preventDefault();
+    }
     for (const t of e.changedTouches) {
       const info = touches.get(t.identifier);
       if (info) {
@@ -728,22 +739,31 @@ function setupTouchControls() {
         updateFromTouches();
       }
     }
-  }, { passive: false });
+  }
 
-  canvas.addEventListener('touchend', (e) => {
-    e.preventDefault();
+  function handleTouchEnd(e) {
+    if (gameState === 'playing' || gameState === 'dying') {
+      e.preventDefault();
+    }
     for (const t of e.changedTouches) {
       touches.delete(t.identifier);
       updateFromTouches();
     }
-  }, { passive: false });
+  }
 
-  canvas.addEventListener('touchcancel', (e) => {
+  function handleTouchCancel(e) {
     for (const t of e.changedTouches) {
       touches.delete(t.identifier);
       updateFromTouches();
     }
-  }, { passive: false });
+  }
+
+  // Use document + capture phase so we receive touches before any child consumes them.
+  // iOS Safari often doesn't deliver touch events to canvas when nested in divs.
+  document.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+  document.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+  document.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
+  document.addEventListener('touchcancel', handleTouchCancel, { passive: false, capture: true });
 }
 
 setupTouchControls();
