@@ -81,60 +81,77 @@ function initPlayer() {
   player.y = H - PLAYER_H - 20;
 }
 
-// Shared AudioContext for iOS compatibility - must be resumed after user gesture
-let sharedAudioCtx = null;
+// iOS: Use HTML5 Audio instead of Web Audio API (more reliable on Safari)
+let audioUnlocked = false;
+let deathSoundUrl = null;
+let gameOverSoundUrl = null;
 
-function getAudioContext() {
-  if (!sharedAudioCtx) {
-    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+/** Generate a WAV blob for a descending buzz (square wave). Returns blob URL. */
+function createDescendingToneWav(startFreq, endFreq, durationSec, volume) {
+  const sampleRate = 22050;
+  const numSamples = Math.floor(sampleRate * durationSec);
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+  const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const freq = startFreq + (endFreq - startFreq) * (t / durationSec);
+    const phase = 2 * Math.PI * t * (startFreq + (endFreq - startFreq) * (t / durationSec) / 2);
+    const sample = (Math.sin(phase) < 0 ? -1 : 1) * volume * (1 - t / durationSec);
+    view.setInt16(44 + i * 2, Math.max(-32767, Math.min(32767, sample * 32767)), true);
   }
-  return sharedAudioCtx;
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
 }
 
-/** Call on first user interaction (e.g. tap START). Required for iOS Safari. */
+function initAudioBlobs() {
+  if (deathSoundUrl) return;
+  deathSoundUrl = createDescendingToneWav(220, 55, 0.18, 0.25);
+  gameOverSoundUrl = createDescendingToneWav(330, 55, 0.55, 0.2);
+}
+
+/** Call on first user interaction. Required for iOS Safari. */
 function unlockAudio() {
+  initAudioBlobs();
+  if (audioUnlocked) return;
+  audioUnlocked = true;
   try {
-    const ctx = getAudioContext();
-    if (ctx.state === 'suspended') {
-      ctx.resume();
-    }
+    if ('audioSession' in navigator) navigator.audioSession.type = 'playback';
+  } catch (_) {}
+  try {
+    const el = new Audio(deathSoundUrl);
+    el.volume = 0.15;
+    el.play().then(() => {}).catch(() => {});
   } catch (_) {}
 }
 
 function playDeathSound() {
   try {
-    const audioCtx = getAudioContext();
-    // Classic Space Invaders: short punchy descending buzz
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-    osc.frequency.linearRampToValueAtTime(55, audioCtx.currentTime + 0.15);
-    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
-    osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + 0.18);
+    initAudioBlobs();
+    const el = new Audio(deathSoundUrl);
+    el.volume = 0.3;
+    el.play().catch(() => {});
   } catch (_) {}
 }
 
 function playGameOverSound() {
   try {
-    const audioCtx = getAudioContext();
-    // Longer, more dramatic descending tone to emphasize game over
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(330, audioCtx.currentTime);
-    osc.frequency.linearRampToValueAtTime(110, audioCtx.currentTime + 0.25);
-    osc.frequency.linearRampToValueAtTime(55, audioCtx.currentTime + 0.5);
-    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.55);
-    osc.start(audioCtx.currentTime);
-    osc.stop(audioCtx.currentTime + 0.55);
+    initAudioBlobs();
+    const el = new Audio(gameOverSoundUrl);
+    el.volume = 0.3;
+    el.play().catch(() => {});
   } catch (_) {}
 }
 
