@@ -81,9 +81,29 @@ function initPlayer() {
   player.y = H - PLAYER_H - 20;
 }
 
+// Shared AudioContext for iOS compatibility - must be resumed after user gesture
+let sharedAudioCtx = null;
+
+function getAudioContext() {
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return sharedAudioCtx;
+}
+
+/** Call on first user interaction (e.g. tap START). Required for iOS Safari. */
+function unlockAudio() {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+  } catch (_) {}
+}
+
 function playDeathSound() {
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioCtx = getAudioContext();
     // Classic Space Invaders: short punchy descending buzz
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -101,7 +121,7 @@ function playDeathSound() {
 
 function playGameOverSound() {
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioCtx = getAudioContext();
     // Longer, more dramatic descending tone to emphasize game over
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -673,6 +693,7 @@ document.addEventListener('keydown', (e) => {
   const introEl = document.getElementById('introScreen');
   if (!introEl.classList.contains('hidden') && (e.key === ' ' || e.key === 'Enter')) {
     e.preventDefault();
+    unlockAudio();
     introEl.classList.add('hidden');
     startGame();
     return;
@@ -691,11 +712,16 @@ document.addEventListener('keyup', (e) => {
   keys[e.key] = false;
 });
 
-// Intro screen - start game when button clicked
-document.getElementById('startBtn').addEventListener('click', () => {
+// Intro screen - start game when button clicked/tapped
+const startBtn = document.getElementById('startBtn');
+function onStartGame() {
+  unlockAudio(); // Required for iOS Safari - must run in response to user gesture
   document.getElementById('introScreen').classList.add('hidden');
   startGame();
-});
+}
+startBtn.addEventListener('click', onStartGame);
+// Unlock audio on touchstart (iOS fires this before click; click will still start the game)
+startBtn.addEventListener('touchstart', () => unlockAudio(), { passive: true });
 
 // Touch controls (iOS / mobile): finger 1 = move ship, finger 2 = fire
 function isTouchDevice() {
@@ -730,6 +756,7 @@ function setupTouchControls() {
 
     if (gameState === 'gameOver' || gameState === 'win') {
       e.preventDefault();
+      unlockAudio();
       startGame();
     }
     if (gameState === 'playing' || gameState === 'dying') {
